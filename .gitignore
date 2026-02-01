@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+
+# Models and Checkpoints (Too large for git)
+models/
+outputs/
+*.safetensors
+*.pt
+*.bin
+
+# Unsloth / Hugging Face Caches
+unsloth_compiled_cache/
+hf_cache/
+
+# System
+.DS_Store
+Thumbs.db
