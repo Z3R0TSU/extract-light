@@ -106,22 +106,47 @@ tests = [
 
 ## Quick Start
 
-### Installation
+### Requirements
+
+- Python 3.10
+- A CUDA-capable GPU
+- Git
+
+### Setup
+
+Clone the repo and create a virtual environment:
 
 ```bash
 git clone https://github.com/Z3R0TSU/extract-light.git
 cd extract-light
-uv sync
+python3.10 -m venv .venv
 ```
 
-Dependencies are pinned in `pyproject.toml` and locked in `uv.lock`, including CUDA 12.1 wheels for PyTorch.
-
-### Manual install (without uv)
+Activate it:
 
 ```bash
-uv pip install torch==2.3.1 torchvision==0.18.1 xformers==0.0.27 --index-url https://download.pytorch.org/whl/cu121
-uv pip install "unsloth[windows] @ git+https://github.com/unslothai/unsloth.git"
-uv pip install transformers datasets trl pyyaml
+# Windows
+.venv\Scripts\activate
+
+# Linux / Mac
+source .venv/bin/activate
+```
+
+Install PyTorch first. Use whichever CUDA version matches your driver:
+
+```bash
+# CUDA 13.0
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+
+# CUDA 12.1
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+```
+
+Then install the remaining dependencies:
+
+```bash
+pip install "unsloth[windows] @ git+https://github.com/unslothai/unsloth.git"
+pip install transformers datasets trl pyyaml
 ```
 
 ### Train
@@ -130,7 +155,7 @@ uv pip install transformers datasets trl pyyaml
 python train.py
 ```
 
-Saves the LoRA adapter to `models/sql_specialist_lora/`.
+Downloads the dataset, runs 60 training steps, and saves the adapter to `models/sql_specialist_lora/`. Took about 10 minutes on a single GPU.
 
 ### Inference
 
@@ -138,7 +163,7 @@ Saves the LoRA adapter to `models/sql_specialist_lora/`.
 python inference.py
 ```
 
-Loads the saved adapter and runs the test queries.
+Loads the saved adapter and runs the five test queries. SQL output streams to the terminal for each one.
 
 ---
 
