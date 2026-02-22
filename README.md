@@ -1,30 +1,30 @@
-# extract-light — Lightweight SQL Specialist via LoRA Fine-Tuning
+# extract-light
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/)
 [![Model: LLaMA 3.2 1B](https://img.shields.io/badge/model-LLaMA%203.2%201B-orange.svg)](https://huggingface.co/unsloth/Llama-3.2-1B-Instruct)
 
-A lightweight, schema-aware natural language to SQL system built by fine-tuning LLaMA 3.2-1B-Instruct using LoRA adapters and 4-bit quantization. Designed for efficient, edge-friendly deployment — not maximum compute.
+Lightweight LoRA fine-tuning pipeline for natural language to SQL generation. Fine-tunes LLaMA 3.2-1B-Instruct with 4-bit quantization to keep training and inference runnable on a single consumer GPU.
 
 ---
 
-## The Problem with Naive Text-to-SQL
+## The Problem
 
-Most text-to-SQL demos fail silently: they generate syntactically valid SQL that references tables and columns that don't exist. A model that doesn't know your schema will hallucinate column names with confidence.
+Most text-to-SQL approaches hallucinate column and table names because the model has no knowledge of the actual schema. The output is syntactically valid but wrong.
 
-extract-light addresses this by taking a `CREATE TABLE` statement as explicit context alongside every query. The model generates SQL grounded in the actual schema — the same approach used by production tools like GitHub Copilot and Cursor's SQL features.
+This project fixes that by passing a `CREATE TABLE` statement as context with every query. The model generates SQL grounded in the real schema instead of guessing.
 
 ---
 
 ## Design Decisions
 
-**Why LLaMA 3.2-1B instead of a larger model?**
-Larger models generate better SQL out of the box, but require significant infrastructure to deploy and fine-tune. The goal here was to demonstrate that a 1B parameter model, properly fine-tuned on domain-specific data, can produce high-quality SQL — and run on a single consumer GPU or CPU with quantization.
+**Why LLaMA 3.2-1B and not a larger model?**
+The goal was to show that a small model, fine-tuned on domain-specific data, can produce accurate SQL without needing large infrastructure. It runs on a single GPU with quantization.
 
-**Why LoRA instead of full fine-tuning?**
-LoRA (Low-Rank Adaptation) freezes the base model weights and trains a small set of adapter parameters (~1-2% of total parameters). This reduces memory requirements dramatically while preserving base model knowledge. The resulting adapter is ~45MB — deployable anywhere the base model runs.
+**Why LoRA?**
+LoRA freezes the base model and only trains a small set of adapter weights (roughly 1-2% of total parameters). This cuts memory requirements significantly and produces a ~45MB adapter file that can be swapped onto the base model anywhere.
 
 **Why 4-bit quantization?**
-4-bit quantization via bitsandbytes reduces the model's memory footprint by ~75% with minimal quality loss on structured generation tasks like SQL. Combined with LoRA, the full fine-tuning pipeline runs on a single 16GB GPU.
+Reduces the model's memory footprint by ~75% with minimal impact on output quality for structured tasks like SQL generation. Combined with LoRA, the full pipeline fits on a 16GB GPU.
 
 ---
 
@@ -33,20 +33,20 @@ LoRA (Low-Rank Adaptation) freezes the base model weights and trains a small set
 | Parameter | Value |
 |-----------|-------|
 | Base model | `unsloth/Llama-3.2-1B-Instruct` |
-| Dataset | `b-mc2/sql-create-context` (78,577 NL→SQL pairs) |
+| Dataset | `b-mc2/sql-create-context` (78,577 NL to SQL pairs) |
 | Training samples | 1,000 |
 | Training steps | 60 |
 | LoRA rank | 16 |
 | Quantization | 4-bit (bitsandbytes) |
 | Adapter size | ~45MB |
 
-The dataset provides natural language questions paired with `CREATE TABLE` context and target SQL — ensuring the model learns schema-grounded generation rather than schema-free hallucination.
+The dataset pairs natural language questions with `CREATE TABLE` context and correct SQL answers. This teaches the model schema-grounded generation rather than free-form guessing.
 
 ---
 
 ## Input Format
 
-Every inference call follows this structure:
+Every inference call uses this structure:
 
 ```
 Question: <natural language query>
@@ -54,7 +54,7 @@ Schema:   <CREATE TABLE statement>
 Answer:   <generated SQL>
 ```
 
-**Example 1 — Join query:**
+**Example 1 - Join query:**
 ```
 Question: Show the themes of competitions hosted in cities with population over 1000.
 Schema:   CREATE TABLE city (City_ID VARCHAR, Population INTEGER);
@@ -64,7 +64,7 @@ Answer:   SELECT T2.Theme FROM city AS T1
           WHERE T1.Population > 1000
 ```
 
-**Example 2 — Aggregation:**
+**Example 2 - Aggregation:**
 ```
 Question: Show the different city statuses and average population for each.
 Schema:   CREATE TABLE city (Status VARCHAR, Population INTEGER)
@@ -75,29 +75,29 @@ Answer:   SELECT Status, AVG(Population) FROM city GROUP BY Status
 
 ## Sample Inference Queries
 
-Test queries used to evaluate the fine-tuned adapter post-training:
+Test queries run after training to check the adapter:
 
 ```python
-queries = [
+tests = [
     {
-        "question": "List students enrolled in 'Computer Science' with GPA > 3.5, ordered by GPA descending.",
-        "schema": "CREATE TABLE students (name VARCHAR, gpa FLOAT, major VARCHAR)"
+        "q": "List the names of students who enrolled in 'Computer Science' and have a GPA higher than 3.5, ordered by GPA descending.",
+        "c": "CREATE TABLE students (name VARCHAR, gpa FLOAT, major VARCHAR)"
     },
     {
-        "question": "Calculate the average salary of Engineering employees hired before 2020.",
-        "schema": "CREATE TABLE employees (salary FLOAT, department VARCHAR, hire_date DATE)"
+        "q": "Calculate the average salary of employees in the 'Engineering' department who were hired before 2020.",
+        "c": "CREATE TABLE employees (salary INT, department VARCHAR, hire_date DATE)"
     },
     {
-        "question": "Find the total number of orders and sum of amounts for customer 'John Doe'.",
-        "schema": "CREATE TABLE orders (id INT, customer_name VARCHAR, total_amount FLOAT)"
+        "q": "Find the total number of orders and the sum of total amounts for customer 'John Doe'.",
+        "c": "CREATE TABLE orders (id INT, customer_name VARCHAR, total_amount FLOAT)"
     },
     {
-        "question": "Show the top 5 most expensive products currently in stock.",
-        "schema": "CREATE TABLE products (name VARCHAR, price FLOAT, stock_quantity INT)"
+        "q": "Show me the top 5 most expensive products that are currently in stock.",
+        "c": "CREATE TABLE products (name VARCHAR, price DECIMAL, stock_quantity INT)"
     },
     {
-        "question": "Which cities have more than 10 customers?",
-        "schema": "CREATE TABLE customers (id INT, city VARCHAR)"
+        "q": "Which cities have more than 10 customers? Return the city and customer count.",
+        "c": "CREATE TABLE customers (id INT, city VARCHAR)"
     }
 ]
 ```
@@ -114,11 +114,9 @@ cd extract-light
 uv sync
 ```
 
-Dependencies are declared in `pyproject.toml` and locked in `uv.lock`. `uv sync` installs everything, including the pinned CUDA 12.1 wheels for PyTorch.
+Dependencies are pinned in `pyproject.toml` and locked in `uv.lock`, including CUDA 12.1 wheels for PyTorch.
 
-### Dependencies (manual install)
-
-If installing manually without `uv sync`:
+### Manual install (without uv)
 
 ```bash
 uv pip install torch==2.3.1 torchvision==0.18.1 xformers==0.0.27 --index-url https://download.pytorch.org/whl/cu121
@@ -126,21 +124,21 @@ uv pip install "unsloth[windows] @ git+https://github.com/unslothai/unsloth.git"
 uv pip install transformers datasets trl pyyaml
 ```
 
-### Fine-tune the model
+### Train
 
 ```bash
 python train.py
 ```
 
-Adapter weights are saved to `models/sql_specialist_lora/`.
+Saves the LoRA adapter to `models/sql_specialist_lora/`.
 
-### Run inference
+### Inference
 
 ```bash
 python inference.py
 ```
 
-Loads the saved LoRA adapter and runs the test queries defined in the script.
+Loads the saved adapter and runs the test queries.
 
 ---
 
@@ -148,12 +146,12 @@ Loads the saved LoRA adapter and runs the test queries defined in the script.
 
 ```
 extract-light/
-├── train.py          # LoRA fine-tuning pipeline
-├── inference.py      # Load adapter and run sample queries
-├── config.yaml       # Training hyperparameters
-├── pyproject.toml    # Project dependencies
+├── train.py          # fine-tuning pipeline
+├── inference.py      # load adapter and run queries
+├── config.yaml       # model and training config
+├── pyproject.toml    # dependencies
 └── models/
-    └── sql_specialist_lora/   # Saved LoRA adapter weights (~45MB)
+    └── sql_specialist_lora/   # saved LoRA adapter (~45MB)
 ```
 
 ---
@@ -162,16 +160,16 @@ extract-light/
 
 | Component | Technology |
 |-----------|------------|
-| Base Model | LLaMA 3.2-1B-Instruct (Unsloth) |
+| Base model | LLaMA 3.2-1B-Instruct via Unsloth |
 | Fine-tuning | LoRA via PEFT |
-| Quantization | 4-bit (bitsandbytes) |
-| Training Framework | TRL (SFTTrainer) |
-| Dataset | b-mc2/sql-create-context (HuggingFace) |
+| Quantization | 4-bit via bitsandbytes |
+| Training | TRL SFTTrainer |
+| Dataset | b-mc2/sql-create-context on HuggingFace |
 
 ---
 
-## Limitations and Future Work
+## Limitations
 
-- Trained on 1,000 samples for 60 steps — extended training on the full 78K dataset would improve accuracy on complex multi-join queries
-- No beam search or constrained decoding — adding grammar-constrained generation would eliminate any remaining syntax errors
-- Evaluation against Spider or BIRD benchmark would provide a formal accuracy baseline
+- Trained on 1,000 of 78,577 available samples. More training steps on the full dataset would improve accuracy on complex multi-join queries.
+- No constrained decoding. Adding grammar-constrained generation would catch any remaining syntax errors.
+- No formal benchmark evaluation yet. Testing against Spider or BIRD would give a real accuracy number.

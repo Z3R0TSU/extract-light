@@ -2,14 +2,14 @@ import os
 from unsloth import FastLanguageModel
 from transformers import TextStreamer
 
-# 1. Configuration
+
 checkpoint_path = "models/sql_specialist_lora"
 
 if not os.path.exists(checkpoint_path):
     print(f"Error: Model not found at {checkpoint_path}. Run train.py first.")
     exit(1)
 
-# 2. Load Model
+
 print("Loading model...")
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = checkpoint_path,
@@ -47,7 +47,7 @@ def run_query(question, context):
     text_streamer = TextStreamer(tokenizer, skip_prompt=True)
     _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128)
 
-# 3. Challenging Test Cases
+# test queries
 tests = [
     {
         "q": "List the names of students who enrolled in 'Computer Science' and have a GPA higher than 3.5, ordered by GPA descending.",
