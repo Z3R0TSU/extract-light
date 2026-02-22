@@ -1,16 +1,25 @@
 [project]
 name = "extract-light"
 version = "0.1.0"
-description = "Add your description here"
+description = "Edge AI Extraction"
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = []
-[[tool.uv.index]]
-name = "pytorch"
-url = "https://download.pytorch.org/whl/cu130"
-explicit = true
+# 1. Force Python 3.10 (The most stable version for Windows AI)
+requires-python = "==3.10.*"
+dependencies = [
+    "torch==2.3.1",
+    "torchvision==0.18.1",
+    "xformers==0.0.27",
+    "unsloth[windows] @ git+https://github.com/unslothai/unsloth.git",
+    "datasets",
+    "trl",
+    "transformers",
+    "pyyaml",
+    "numpy<2"
+]
 
+# 2. THE FIX: Explicitly tell uv where to find the GPU engines.
+# These URLs are for Python 3.10 + CUDA 12.1
 [tool.uv.sources]
-torch = [{ index = "pytorch" }]
-torchvision = [{ index = "pytorch" }]
-xformers = [{ index = "pytorch" }]
+torch = { url = "https://download.pytorch.org/whl/cu121/torch-2.3.1%2Bcu121-cp310-cp310-win_amd64.whl" }
+torchvision = { url = "https://download.pytorch.org/whl/cu121/torchvision-0.18.1%2Bcu121-cp310-cp310-win_amd64.whl" }
+xformers = { url = "https://download.pytorch.org/whl/cu121/xformers-0.0.27-cp310-cp310-win_amd64.whl" }
